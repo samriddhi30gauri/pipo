@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Command - RBI Edition v2</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'JetBrains Mono',Consolas,monospace;background:#0a0e14;color:#c5cddb;min-height:100vh;padding:16px;line-height:1.5}
+.top-bar{display:flex;justify-content:space-between;align-items:center;background:#111820;border:1px solid #1e2a3a;padding:14px 18px;border-radius:12px;margin-bottom:16px;flex-wrap:wrap;gap:12px}
+.brand h1{font-size:16px;color:#fff;letter-spacing:0.5px}
+.brand p{font-size:11px;color:#7a8ca3;margin-top:2px}
+.stats{display:flex;gap:20px}
+.stat{text-align:center;min-width:70px}
+.stat-label{font-size:10px;color:#7a8ca3;text-transform:uppercase;letter-spacing:1px}
+.stat-value{font-size:22px;font-weight:800;margin-top:2px}
+.grid{display:grid;grid-template-columns:320px 1fr 280px;gap:16px}
+@media(max-width:1100px){.grid{grid-template-columns:1fr}}
+.card{background:#151d2b;border:1px solid #253041;border-radius:10px;padding:12px;margin-bottom:10px;transition:border 0.2s}
+.card:hover{border-color:#2e405a}
+.card-title{font-size:11px;color:#7a8ca3;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px}
+.btn{width:100%;background:#2a3f5f;color:#fff;border:1px solid #3a557a;padding:9px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.3px}
+.btn:hover{background:#35507a;transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-red{background:#3d1f1f;border-color:#6b2a2a;color:#ff9a9a}
+.btn-red:hover{background:#5a2a2a}
+.btn-green{background:#1a3d25;border-color:#2a6b3a;color:#8aff9a}
+.btn-green:hover{background:#234f30}
+.btn-ghost{background:transparent;border-color:#253041;color:#7a8ca3}
+.badge{padding:3px 7px;border-radius:5px;font-size:9px;font-weight:800;letter-spacing:0.5px}
+.badge-HIGH{background:#7a1f1f33;color:#ff9a9a;border:1px solid #7a1f1f66}
+.badge-LOW{background:#1a3a1f33;color:#8aff9a;border:1px solid #1a3a1f66}
+.badge-MEDIUM{background:#7a5a1f33;color:#ffcc66;border:1px solid #7a5a1f66}
+.badge-CRITICAL{background:#ff000022;color:#ff4444;border:1px solid #ff000066;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
+.log{background:#070a10;border:1px solid #1e2a3a;border-radius:10px;padding:12px;height:220px;overflow-y:auto;font-size:11px;line-height:1.7}
+.log::-webkit-scrollbar{width:6px}
+.log::-webkit-scrollbar-thumb{background:#253041;border-radius:3px}
+.gates{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.gate{flex:1;min-width:90px;background:#11161f;border:1px solid #1e2a3a;padding:8px 10px;border-radius:8px;text-align:center}
+.gate.active{border-color:#3a557a;background:#1a2332}
+.gate.pass{border-color:#1a5a2a;background:#1a3a1f33}
+.gate.fail{border-color:#7a1f1f;background:#7a1f1f33}
+.gate-name{font-size:10px;color:#7a8ca3}
+.gate-status{font-size:10px;font-weight:700;margin-top:2px}
+.meter{width:100%;height:8px;background:#070a10;border-radius:4px;overflow:hidden;margin-top:8px;border:1px solid #1e2a3a}
+.meter-fill{height:100%;transition:all 0.4s ease;border-radius:4px}
+.canary-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.pr-card{position:relative;overflow:hidden}
+.pr-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.pr-card.risk-HIGH::before{background:#ff6a6a}
+.pr-card.risk-LOW::before{background:#22c55e}
+.pr-card.risk-MEDIUM::before{background:#eab308}
+.pr-card.risk-CRITICAL::before{background:#ef4444}
+.evidence-item{font-size:10px;padding:4px 0;border-bottom:1px solid #1e2a3a22}
+.evidence-item:last-child{border:0}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="brand">
+    <h1>PIPELINE COMMAND — RBI EDITION v2</h1>
+    <p>NovaPay Release Train • Q4 Diwali Rush • Day <span id="day">1</span>/12 • SRE Simulation</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Trust</div><div class="stat-value" id="trust">100</div></div>
+    <div class="stat"><div class="stat-label">Shipped</div><div class="stat-value" id="shipped" style="color:#fff">0</div></div>
+    <div class="stat"><div class="stat-label">Debt</div><div class="stat-value" id="debt" style="color:#ff6a6a">0</div></div>
+    <div class="stat"><div class="stat-label">Value</div><div class="stat-value" id="value" style="color:#22c55e">0</div></div>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- LEFT: PR INBOX -->
+  <div>
+    <div class="card-title">📥 PR Inbox — Click MERGE to Start</div>
+    <div id="inbox"></div>
+  </div>
+
+  <!-- CENTER: PIPELINE -->
+  <div>
+    <div class="card-title">⚙️ Pipeline & Logs</div>
+    <div class="gates" id="gates">
+      <div class="gate" id="gate-build"><div class="gate-name">Build</div><div class="gate-status">IDLE</div></div>
+      <div class="gate" id="gate-contract"><div class="gate-name">Contract</div><div class="gate-status">IDLE</div></div>
+      <div class="gate" id="gate-sast"><div class="gate-name">SAST/CVE</div><div class="gate-status">IDLE</div></div>
+      <div class="gate" id="gate-comp"><div class="gate-name">Compliance</div><div class="gate-status">IDLE</div></div>
+      <div class="gate" id="gate-canary"><div class="gate-name">Canary</div><div class="gate-status">IDLE</div></div>
+    </div>
+
+    <div class="log" id="log"></div>
+    <div id="actions" style="margin-top:12px"></div>
+
+    <div class="canary-actions">
+      <button class="btn btn-ghost" onclick="ramp(5)">Ramp 5%</button>
+      <button class="btn btn-ghost" onclick="ramp(25)">Ramp 25%</button>
+      <button class="btn btn-green" onclick="ramp(100)">🚀 Ramp 100% — SHIP</button>
+      <button class="btn btn-red" onclick="rollback()">⏪ ROLLBACK (+5 Trust)</button>
+    </div>
+
+    <div class="card" style="margin-top:14px;background:#0f141e">
+      <div style="font-size:11px;color:#7a8ca3">Quick Guide</div>
+      <div style="font-size:10px;color:#5a6c85;margin-top:6px;line-height:1.6">
+        1. Merge <b style="color:#8aff9a">PR-108 Mask PAN</b> first → fixes PR-101<br>
+        2. PR-107 DB Keys <b style="color:#ffcc66">must by Day 6</b> or audit<br>
+        3. <b style="color:#ff4444">PR-131 HOTFIX is TRAP</b> — never bypass signature<br>
+        4. Ship LOW → MED → HIGH. Rollback = good SRE judgment
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: SCORE -->
+  <div>
+    <div class="card-title">🏆 Score & Lesson</div>
+    
+    <div class="card">
+      <div style="font-size:11px;display:flex;justify-content:space-between"><span>Trust Score</span><span id="trustPct">100%</span></div>
+      <div class="meter"><div id="trustBar" class="meter-fill" style="width:100%;background:#22c55e"></div></div>
+      <div style="font-size:9px;color:#5a6c85;margin-top:6px">If &lt;60 → RBI Audit Freeze ❄️</div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:11px">Uptime: <span id="uptime">100.00%</span> • Day: <span id="dayRight">1</span>/12</div>
+      <div style="font-size:11px;margin-top:6px">Features Value: <b id="valueRight" style="color:#22c55e">0</b></div>
+      <div style="font-size:10px;color:#5a6c85;margin-top:4px">Shipped: <span id="shippedRight">0</span> / 7 PRs</div>
+    </div>
+
+    <div class="card" style="border-color:#7a4a1f55;background:#1a160f">
+      <div style="font-size:11px;color:#ffcc66;font-weight:800">💡 Why this matters for RBI</div>
+      <div id="lesson" style="font-size:11px;color:#8a9bb4;margin-top:8px;line-height:1.6">
+        Don't bypass gates. Each override adds hidden Audit Debt. After 2 debts, RBI audit freezes your train for 1 day. That's real cost of shortcuts.
+        <br><br>
+        <span style="color:#ffcc66">SOD Principle:</span> Same person cannot author + approve PCI changes. OPA-42 blocks it.
+      </div>
+    </div>
+
+    <div class="card" style="background:#000">
+      <div style="font-size:10px;color:#7a8ca3;font-weight:800;letter-spacing:0.8px">📦 EVIDENCE LOCKER</div>
+      <div id="evidence" style="font-size:10px;color:#5a6c85;margin-top:8px">No evidence yet — ship PRs to collect</div>
+    </div>
+
+    <button class="btn btn-ghost" style="margin-top:10px" onclick="resetGame()">🔄 Reset Quarter</button>
+  </div>
+</div>
+
+<script>
+// === GAME DATA ===
+const PRS = [
+  {id:"PR-101", title:"UPI AutoPay Mandate", risk:"HIGH", value:25, safe:false, reason:"Logs PAN plaintext - RBI violation. Fix: Merge PR-108 first", rbi:"RBI Data Localisation 2018", files:18},
+  {id:"PR-108", title:"Mask PAN to 6/4", risk:"LOW", value:2, safe:true, reason:"POSITIVE - Fixes PR-101, PCI 3.4 compliant", rbi:"PCI 3.4", files:3},
+  {id:"PR-104", title:"Bump log4j 2.19", risk:"LOW", value:5, safe:true, reason:"Safe CVE patch - transitive dep", rbi:"Vuln Mgmt", files:5},
+  {id:"PR-107", title:"Rotate DB keys (Must by Day 6)", risk:"MEDIUM", value:3, safe:true, reason:"Must merge before Day 6 or auto-audit freeze", rbi:"RBI CSF Crypto", files:8},
+  {id:"PR-131", title:"HOTFIX: Disable signature verification", risk:"CRITICAL", value:30, safe:false, reason:"TRAP! Trust -40, Never bypass security - RBI Incident", rbi:"RBI CSF Incident", files:1},
+  {id:"PR-124", title:"Fix wallet race condition", risk:"HIGH", value:12, safe:true, reason:"Critical fix - prevents double debit", rbi:"Customer Protection", files:12},
+  {id:"PR-113", title:"Hindi language support", risk:"LOW", value:10, safe:true, reason:"Safe UI change - no PCI scope", rbi:"None", files:6},
+];
+
+let state = { trust:100, day:1, shipped:0, debt:0, value:0, current:null, canary:0, merged:[], uptime:100 };
+
+function log(msg, color="#7a8ca3"){
+  const el=document.getElementById('log');
+  const d=document.createElement('div');
+  d.style.color=color; d.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(d); el.scrollTop=el.scrollHeight;
+}
+
+function setGate(id, status){
+  const el=document.getElementById('gate-'+id);
+  if(!el) return;
+  el.className='gate '+status;
+  el.querySelector('.gate-status').textContent=status.toUpperCase();
+  if(status==='active') el.querySelector('.gate-status').style.color='#ffcc66';
+  if(status==='pass') el.querySelector('.gate-status').style.color='#22c55e';
+  if(status==='fail') el.querySelector('.gate-status').style.color='#ff6a6a';
+}
+
+function render(){
+  const inbox=document.getElementById('inbox'); inbox.innerHTML='';
+  PRS.forEach(pr=>{
+    const div=document.createElement('div'); div.className='card pr-card risk-'+pr.risk;
+    div.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:10px;color:#7a8ca3">${pr.id} • ${pr.files} files</span>
+        <span class="badge badge-${pr.risk}">${pr.risk}</span>
+      </div>
+      <div style="font-size:12px;font-weight:800;color:#fff;margin:8px 0 4px 0">${pr.title}</div>
+      <div style="font-size:10px;color:#8a9bb4;line-height:1.4">+${pr.value} value • ${pr.reason}</div>
+      <div style="font-size:9px;color:#5a6c85;margin-top:6px">RBI: ${pr.rbi}</div>
+      <button class="btn" style="margin-top:10px" onclick="merge('${pr.id}')">MERGE & RUN PIPELINE →</button>
+    `;
+    inbox.appendChild(div);
+  });
+
+  document.getElementById('day').textContent=state.day;
+  document.getElementById('dayRight').textContent=state.day;
+  document.getElementById('trust').textContent=state.trust;
+  document.getElementById('trustPct').textContent=state.trust+'%';
+  document.getElementById('shipped').textContent=state.shipped;
+  document.getElementById('shippedRight').textContent=state.shipped;
+  document.getElementById('debt').textContent=state.debt;
+  document.getElementById('value').textContent=state.value;
+  document.getElementById('valueRight').textContent=state.value;
+  document.getElementById('uptime').textContent=state.uptime.toFixed(2)+'%';
+
+  const bar=document.getElementById('trustBar');
+  bar.style.width=state.trust+'%';
+  bar.style.background=state.trust>80?'#22c55e':state.trust>60?'#eab308':'#ef4444';
+  document.getElementById('trust').style.color=state.trust>80?'#22c55e':state.trust>60?'#eab308':'#ef4444';
+
+  document.getElementById('evidence').innerHTML= state.merged.length ? state.merged.map(m=>`<div class="evidence-item">✓ ${m.id} — ${m.title} (+${m.value})</div>`).join('') : 'No evidence yet — ship PRs to collect';
+}
+
+function merge(id){
+  const pr=PRS.find(p=>p.id===id);
+  state.current=pr;
+  log(`Merging ${pr.id}: ${pr.title}`, "#fff");
+  setGate('build','active'); log(`Build: Running npm run build...`, "#7a8ca3");
+  
+  setTimeout(()=>{
+    setGate('build','pass'); log(`Build: PASS ✓`, "#22c55e");
+    setGate('contract','active'); log(`Contract Tests: Running NPCI simulator...`, "#7a8ca3");
+    
+    setTimeout(()=>{
+      if(Math.random()<0.15){
+        setGate('contract','fail'); log(`Contract: FAIL - NPCI_SIMULATOR timeout 504 (flaky test)`, "#ff6a6a");
+        showFail(); return;
+      }
+      setGate('contract','pass'); log(`Contract: PASS ✓`, "#22c55e");
+      
+      if(!pr.safe){
+        setGate('sast','fail'); log(`SAST: CRITICAL FAIL - ${pr.reason}`, "#ff6a6a");
+        showFail();
+      } else {
+        setGate('sast','pass'); log(`SAST: PASS - No CVEs, No PII leak ✓`, "#22c55e");
+        setGate('comp','pass'); log(`Compliance: PASS - Evidence collected for RBI ✓`, "#22c55e");
+        setGate('canary','active'); log(`Ready for canary. Click Ramp 5% →`, "#ffcc66");
+      }
+    },900);
+  },700);
+}
+
+function showFail(){
+  document.getElementById('actions').innerHTML=`
+    <div class="card" style="border-color:#7a1f1f;background:#1a0f0f">
+      <div style="font-size:12px;color:#ff9a9a;font-weight:800">🚨 Gate Failed — Choose Action</div>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="btn btn-green" onclick="fix()">✅ Fix Now (-1 Day, +3 Trust)</button>
+        <button class="btn btn-red" onclick="override()">⚠️ Override (-15 Trust, +1 Debt)</button>
+      </div>
+      <div style="font-size:10px;color:#5a6c85;margin-top:8px">Tip: Fix is SRE best practice. Override adds hidden Audit Debt.</div>
+    </div>
+  `;
+}
+
+function fix(){
+  log(`Fixed properly — good SRE practice, costs 1 day`, "#22c55e");
+  state.day++; state.trust=Math.min(100, state.trust+3);
+  document.getElementById('actions').innerHTML='';
+  ['build','contract','sast','comp','canary'].forEach(id=>setGate(id,''));
+  render();
+}
+
+function override(){
+  state.trust-=15; state.debt+=1;
+  log(`OVERRIDE! Trust -15, Debt now ${state.debt} (hidden cost)`, "#ffcc66");
+  if(state.debt>=2){
+    log(`🚨 RBI AUDIT FREEZE! Train frozen 1 day. Trust -5. This is why bypass hurts later.`, "#ff6a6a");
+    state.trust-=5; state.debt=0; state.day++; state.uptime=Math.max(98.5, state.uptime-0.6);
+    document.getElementById('lesson').innerHTML="You bypassed 2 times. That hidden debt triggered audit freeze. Real banks enforce Segregation of Duties (SOD) for this reason.<br><br><b style='color:#ff9a9a'>Lesson: Shortcuts compound.</b>";
+  }
+  document.getElementById('actions').innerHTML='';
+  log(`Overridden. You can ramp canary now, but audit risk increased.`, "#ffcc66");
+  render();
+}
+
+function ramp(p){
+  if(!state.current){log(`No PR in pipeline. Merge one first.`, "#ff6a6a"); return;}
+  state.canary=p;
+  log(`Canary ramping to ${p}%...`, "#fff");
+  setGate('canary','active');
+  
+  if(p===25 && Math.random()<0.4){
+    log(`ALERT: p95 180ms → 450ms, error 0.1% → 0.8% — REGRESSION at 25%!`, "#ff6a6a");
+    log(`Tip: Rollback quickly for +5 Trust (good judgment)`, "#ffcc66");
+  }
+  if(p===100){
+    const idx=PRS.findIndex(x=>x.id===state.current.id);
+    if(idx>=0) PRS.splice(idx,1);
+    state.merged.push(state.current); state.shipped++; state.value+=state.current.value; state.day++; state.canary=0;
+    setGate('canary','pass');
+    log(`✅ Deployed ${state.current.id} to 100%! +${state.current.value} value. Day ${state.day} starts.`, "#22c55e");
+    state.current=null; document.getElementById('actions').innerHTML='';
+    ['build','contract','sast','comp','canary'].forEach(id=>setGate(id,''));
+    render();
+    if(state.day>12){
+      log(`=== QUARTER DONE === Trust:${state.trust} Shipped:${state.shipped} Value:${state.value}`, "#fff");
+      setTimeout(()=>alert(`🎉 Quarter Done!\n\nTrust: ${state.trust}\nFeatures Shipped: ${state.shipped}\nValue: ${state.value}\nUptime: ${state.uptime.toFixed(2)}%\n\n${state.trust>80?'Excellent — RBI Compliant! 🌟':state.trust>60?'Good but some bypasses — watch Debt':'Needs Improvement — Too many bypasses, Audit Freeze risk!'}`),200);
+    }
+  }
+}
+
+function rollback(){
+  if(state.canary===0){log(`No canary running — merge a PR first`, "#7a8ca3"); return;}
+  log(`⏪ Rollback! Good judgment — Trust +5`, "#22c55e");
+  state.trust=Math.min(100, state.trust+5); state.canary=0;
+  setGate('canary','');
+  render();
+}
+
+function resetGame(){
+  if(!confirm('Reset entire quarter?')) return;
+  PRS.length=0;
+  PRS.push(
+    {id:"PR-101", title:"UPI AutoPay Mandate", risk:"HIGH", value:25, safe:false, reason:"Logs PAN plaintext - RBI violation. Fix: Merge PR-108 first", rbi:"RBI Data Localisation 2018", files:18},
+    {id:"PR-108", title:"Mask PAN to 6/4", risk:"LOW", value:2, safe:true, reason:"POSITIVE - Fixes PR-101, PCI 3.4 compliant", rbi:"PCI 3.4", files:3},
+    {id:"PR-104", title:"Bump log4j 2.19", risk:"LOW", value:5, safe:true, reason:"Safe CVE patch - transitive dep", rbi:"Vuln Mgmt", files:5},
+    {id:"PR-107", title:"Rotate DB keys (Must by Day 6)", risk:"MEDIUM", value:3, safe:true, reason:"Must merge before Day 6 or auto-audit freeze", rbi:"RBI CSF Crypto", files:8},
+    {id:"PR-131", title:"HOTFIX: Disable signature verification", risk:"CRITICAL", value:30, safe:false, reason:"TRAP! Trust -40, Never bypass security - RBI Incident", rbi:"RBI CSF Incident", files:1},
+    {id:"PR-124", title:"Fix wallet race condition", risk:"HIGH", value:12, safe:true, reason:"Critical fix - prevents double debit", rbi:"Customer Protection", files:12},
+    {id:"PR-113", title:"Hindi language support", risk:"LOW", value:10, safe:true, reason:"Safe UI change - no PCI scope", rbi:"None", files:6},
+  );
+  state={trust:100, day:1, shipped:0, debt:0, value:0, current:null, canary:0, merged:[], uptime:100};
+  document.getElementById('log').innerHTML='';
+  document.getElementById('actions').innerHTML='';
+  ['build','contract','sast','comp','canary'].forEach(id=>setGate(id,''));
+  log("System ready. Day 1. Merge a PR to start.", "#22c55e");
+  log("Lesson: Don't bypass security gates. Each bypass = hidden debt.", "#7a8ca3");
+  render();
+}
+
+log("🚀 System ready. Day 1. Merge a PR to start.", "#22c55e");
+log("💡 Tip: Start with PR-108 (LOW) → it fixes PR-101 (HIGH)", "#7a8ca3");
+render();
+</script>
+</body>
+</html>
